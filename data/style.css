@@ -1,0 +1,51 @@
+body {
+  background-color: #f0f8f5; /* Light mint green */
+  color: #333; /* Dark gray for text */
+}
+.navbar {
+  background-color: #32cd32; /* Lime green */
+  color: white;
+}
+.navbar-brand {
+  color: white;
+}
+.card {
+  border: 1px solid #32cd32; /* Lime green border */
+}
+.card-header {
+  background-color: #98fb98; /* Pale green */
+  color: #333;
+}
+.btn-primary {
+  background-color: #32cd32; /* Lime green */
+  border-color: #32cd32;
+}
+.btn-primary:hover {
+  background-color: #28a428; /* Darker lime green */
+  border-color: #28a428;
+}
+.btn-info {
+  background-color: #20b2aa; /* Light sea green */
+  border-color: #20b2aa;
+}
+.btn-info:hover {
+  background-color: #1e988f; /* Darker light sea green */
+  border-color: #1e988f;
+}
+.btn-danger {
+  background-color: #ff6347; /* Tomato */
+  border-color: #ff6347;
+}
+.btn-danger:hover {
+  background-color: #e5533d; /* Darker tomato */
+  border-color: #e5533d;
+}
+h1 {
+  color: #32cd32; /* Lime green */
+}
+#log {
+  height: 60vh;
+  overflow-y: scroll;
+  border: 1px solid #ccc;
+  padding: 5px;
+}

@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Mars Logger</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="bootstrap.min.css">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <nav class="navbar navbar-expand-lg navbar-light">
+    <div class="container-fluid">
+      <a class="navbar-brand" href="index.html">Tesla Mars Logger</a>
+    </div>
+  </nav>
+  
+  <div class="container mt-4">
+    <div class="card">
+      <div class="card-header">
+        WiFi Configuration
+      </div>
+      <div class="card-body">
+        <pre id="log">WebSocket Connecting...</pre>
+        <div class="input-group mb-3 flex-nowrap">
+          <label for="commandInput" class="input-group-text">Command:</label>
+          <input type="text" id="commandInput" class="form-control" placeholder="Enter command" disabled>
+          <button id="sendCommand" class="btn btn-success" id="button-addon2" disabled>Send</button>
+        </div>
+        <div class="d-flex justify-content-between">
+          <button id="reboot" class="btn btn-danger">Reboot</button>
+          <div>
+            <a type="button" class="btn btn-primary ml-2" href="wifimanager.html">WiFi Settings</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script src="bootstrap.min.js"></script>
+  <script src="logger.js"></script>
+</body>
+</html>
