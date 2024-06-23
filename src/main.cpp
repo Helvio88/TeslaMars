@@ -1,16 +1,12 @@
 #include <algorithm>
 #include <Arduino.h>
 #include <ArduinoJson.h>
-#include <ArduinoOTA.h>
 #include <AsyncTCP.h>
 #include <ESPAsyncWebServer.h>
-#include <driver/twai.h>
-#include <driver/gpio.h>
 #include <ESPmDNS.h>
 #include <iomanip>
 #include <iostream>
 #include <list>
-#include <LittleFS.h>
 #include <Preferences.h>
 #include <sstream>
 #include <string>
@@ -19,23 +15,27 @@
 #include <WiFiClientSecure.h>
 #include <WiFiUdp.h>
 
+// Own Includes
+#include "fs/FS.h"
+#include "twai/TWAI.h"
+#include "twai/TWAI_IDS.h"
+#include "ota/OTA.h"
+#include "wifi/WIFI.h"
+
 // Define program constants
 #define DEVICE_NAME   "TeslaMars"
 #define BAUDRATE      115200
+#define WIFI_TIMEOUT  10000
 #define LED_PIN       2
 #define TX_PIN        21
 #define RX_PIN        22
 #define HTTP_PORT     80
-#define WIFI_TIMEOUT  10000
 
 // Web Server
 AsyncWebServer server(HTTP_PORT);
 
 // WebSocket Server
 AsyncWebSocket ws("/ws");
-
-// Preferences
-Preferences prefs;
 
 // WiFi Networks
 struct WiFiInfo {
@@ -47,34 +47,28 @@ struct WiFiInfo {
 std::list<WiFiInfo> wifiList;
 
 // Setup Functions
-void startFS();
-void startWiFi();
-void startWiFiAP();
 void startWebSocket();
 void startWebServer();
-void startOTA();
-void startTWAI();
 
 // Loop Functions
 void handleWiFiScan();
 void handleWebSocket(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type, void *arg, uint8_t *data, size_t len);
-void handleTWAI();
 
 void setup() {
   // Start Serial Interface
   Serial.begin(BAUDRATE);
   
   // Start File System (LittleFS + Preferences)
-  startFS();
+  startFS(DEVICE_NAME);
   
-  // Start WiFi and run async scan
-  startWiFi();
+  // Start WiFi
+  startWiFi(getWiFiSSID(), getWiFiPass(), LED_PIN, WIFI_TIMEOUT);
   
   // Start OTA Service
-  startOTA();
+  startOTA(DEVICE_NAME);
   
   // TWAI (CAN) Bus Service
-  startTWAI();
+  startTWAI(TX_PIN, RX_PIN);
   
   // Start WebSocket
   startWebSocket();
@@ -94,55 +88,11 @@ void loop() {
   ws.cleanupClients();
 
   // TWAI Handler
-  handleTWAI();
+  auto frame = handleTWAI();
 
   // Tasks to run at millis interval
   // timer.tick();
   // timer.every(1000, [](void *){ webSocket.broadcastPing(); return true; });
-}
-
-void startFS() {
-  // Preferences is considered File System since it's persisted
-  prefs.begin(DEVICE_NAME);
-  
-  // Begin LittleFS for WebServer
-  if (!LittleFS.begin(true)) {
-    Serial.println("An error has occurred while mounting LittleFS");
-  }
-  Serial.println("LittleFS mounted successfully");
-}
-
-void startWiFi() {
-  pinMode(LED_PIN, OUTPUT);
-  
-  // Get WiFi settings from Preferences
-  String ssid = prefs.getString("ssid", "");
-  String pass = prefs.getString("pass", "");
-  
-  // If no SSID in preferences, use AP mode
-  if (ssid.isEmpty()) {
-    Serial.println("SSID is empty. Soft AP Mode.");
-    startWiFiAP();
-  } else {
-    Serial.printf("Connecting to SSID '%s'\n", ssid);
-    WiFi.begin(ssid, pass);
-    
-    // Connect to WiFi, timeout starts AP mode
-    unsigned long now = millis();
-    while(WiFi.status() != WL_CONNECTED) {
-      if (millis() - now >= WIFI_TIMEOUT) {
-        Serial.println("Failed to connect.");
-        startWiFiAP();
-        return;
-      }
-    }
-    
-    // Successfully connected. Print info.
-    digitalWrite(LED_PIN, HIGH);
-    auto ip = WiFi.localIP();
-    Serial.printf("Connected to %s with IP: ", ssid);
-    Serial.println(ip);
-  }
 }
 
 void startWiFiAP() {
@@ -166,14 +116,7 @@ void startWebServer() {
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
     request->send(LittleFS, "/index.html", "text/html");
   });
-  
-  // Factory command clears preferences
-  server.on("/factory", HTTP_GET, [](AsyncWebServerRequest *request) {
-    Serial.println("Factory Reset called.");
-    request -> send(200, "text/html", "Resetting...");
-    prefs.clear();
-    sleep(500);
-    ESP.restart(); });
+
 
   // Reboot command
   server.on("/reboot", HTTP_GET, [](AsyncWebServerRequest *request) {
@@ -215,8 +158,8 @@ void startWebServer() {
   // Endpoint to handle a new WiFi connection
   server.on("/connect", HTTP_POST, [](AsyncWebServerRequest *request) {
     // Save SSID and Password to Preferences and reboot
-    prefs.putString("ssid", request->arg("ssid"));
-    prefs.putString("pass", request->arg("pass"));
+    setWiFiSSID(request->arg("ssid"));
+    setWiFiPass(request->arg("pass"));
 
     // Respond, sleep, reboot
     // No point in doing it any other way, since the connection will be broken
@@ -231,79 +174,6 @@ void startWebServer() {
   // Start server
   server.begin();
   Serial.println("Web Server started");
-}
-
-void startOTA() {
-  // Set Device Name for Flashing
-  ArduinoOTA.setHostname(DEVICE_NAME);
-  
-  // Start configuration, copied from documentation
-  ArduinoOTA.onStart([]() {
-    String type;
-    if (ArduinoOTA.getCommand() == U_FLASH) {
-      type = "sketch";
-    } else {  // U_SPIFFS
-      type = "filesystem";
-    }
-
-    // NOTE: if updating SPIFFS this would be the place to unmount SPIFFS using SPIFFS.end()
-    Serial.println("Start updating " + type);
-  }).onEnd([]() {
-    Serial.println("End");
-  }).onProgress([](unsigned int progress, unsigned int total) {
-    Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
-  }).onError([](ota_error_t error) {
-      Serial.printf("Error[%u]: ", error);
-    if (error == OTA_AUTH_ERROR) {
-      Serial.println("Auth Failed");
-    } else if (error == OTA_BEGIN_ERROR) {
-      Serial.println("Begin Failed");
-    } else if (error == OTA_CONNECT_ERROR) {
-      Serial.println("Connect Failed");
-    } else if (error == OTA_RECEIVE_ERROR) {
-      Serial.println("Receive Failed");
-    } else if (error == OTA_END_ERROR) {
-      Serial.println("End Failed");
-    }
-  });
-
-  // Start OTA
-  ArduinoOTA.begin();
-  Serial.println("Arduino OTA started");
-}
-
-void startTWAI() {
-  twai_general_config_t general_config = {
-      .mode = TWAI_MODE_NORMAL,
-      .tx_io = (gpio_num_t)TX_PIN,
-      .rx_io = (gpio_num_t)RX_PIN,
-      .clkout_io = (gpio_num_t)TWAI_IO_UNUSED,
-      .bus_off_io = (gpio_num_t)TWAI_IO_UNUSED,
-      .tx_queue_len = 10,
-      .rx_queue_len = 10,
-      .alerts_enabled = TWAI_ALERT_ALL,
-      .clkout_divider = 0
-  };
-
-  twai_timing_config_t timing_config = TWAI_TIMING_CONFIG_500KBITS();
-  twai_filter_config_t filter_config = TWAI_FILTER_CONFIG_ACCEPT_ALL();
-  esp_err_t error;
-
-  error = twai_driver_install(&general_config, &timing_config, &filter_config);
-
-  if(error == ESP_OK) {
-      Serial.println("TWAI Driver Installation OK");
-  } else {
-      Serial.println("TWAI Driver Installation Failed");
-  }
-
-  error = twai_start();
-
-  if(error == ESP_OK) {
-      Serial.println("TWAI Driver Start OK");
-  } else {
-      Serial.println("TWAI Driver Start Failed");
-  }
 }
 
 void handleWiFiScan() {
@@ -350,7 +220,16 @@ void handleWebSocket(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEv
         if (info->final && info->index == 0 && info->len == len && info->opcode == WS_TEXT) {
           data[len] = 0;
           char *payload = (char *)data;
-          int numData = atoi(payload);
+          unsigned int numData;
+          try
+          {
+            numData = std::stoul(payload, nullptr, 16);
+          }
+          catch(const std::exception& e)
+          {
+            std::cerr << e.what() << '\n';
+          }
+          
 
           // Handle WS Message
           if (strcmp(payload, "reboot") == 0) {
@@ -377,25 +256,5 @@ void handleWebSocket(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEv
     case WS_EVT_PONG:
     case WS_EVT_ERROR:
       break;
-  }
-}
-
-void handleTWAI() {
-  twai_message_t rx_frame;
-
-  if (twai_receive(&rx_frame, pdMS_TO_TICKS(1000)) == ESP_OK) {
-    std::ostringstream message;
-
-    auto id = rx_frame.identifier;
-    if (/*!shouldIgnore(id)*/ true) {
-      message << "(0x" << std::hex << id << "): ";
-      for (int i = 0; i < sizeof(rx_frame.data); i++) { //<< std::right << std::setw(4) << payload;
-        message << std::right << std::setw(3) << rx_frame.data[i];
-        if (i < sizeof(rx_frame.data) - 1) {
-          message << " | ";
-        }
-      }
-      ws.textAll(message.str().c_str());
-    }
   }
 }
