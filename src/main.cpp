@@ -1,22 +1,4 @@
-#include <Arduino.h>
-#include <ArduinoJson.h>
-#include <AsyncTCP.h>
-#include <ESPAsyncWebServer.h>
-#include <iomanip>
-#include <iostream>
-#include <sstream>
-#include <string>
-#include <unordered_set>
-#include <WiFi.h>
-#include <WiFiClientSecure.h>
-#include <WiFiUdp.h>
-
-// Own Includes
-#include "fs/FS.h"
-#include "twai/TWAI.h"
-#include "twai/TWAI_IDS.h"
-#include "ota/OTA.h"
-#include "wifi/WIFI.h"
+#include <MARS.h>
 
 // Define program constants
 #define DEVICE_NAME   "TeslaMars"
@@ -26,19 +8,14 @@
 #define TX_PIN        21
 #define RX_PIN        22
 #define HTTP_PORT     80
+#define WS_PATH       "/ws"
 
-// Web Server
+// Timer object with up to 10 tasks
+Timer<10> timer;
+
+// Web Servers
 AsyncWebServer server(HTTP_PORT);
-
-// WebSocket Server
-AsyncWebSocket ws("/ws");
-
-// Setup Functions
-void startWebSocket();
-void startWebServer();
-
-// Loop Functions
-void handleWebSocket(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type, void *arg, uint8_t *data, size_t len);
+AsyncWebSocket ws(WS_PATH);
 
 void setup() {
   // Start Serial Interface
@@ -55,15 +32,15 @@ void setup() {
   
   // TWAI (CAN) Bus Service
   startTWAI(TX_PIN, RX_PIN);
-  
-  // Start WebSocket
-  startWebSocket();
-  
+    
   // Start Web Server
-  startWebServer();
+  startWebServer(server, ws);
 }
 
-void loop() {  
+void loop() {
+  // Start the clock
+  timer.tick();
+
   // Runs whenever there's a result of an async WiFi Scan
   handleWiFiScan();
   
@@ -72,10 +49,38 @@ void loop() {
   
   // Websocket Handler
   ws.cleanupClients();
+  
+  // Simulate TWAI Frame
+  timer.every(15000, [](void *none) {
+    auto frame = simulateTWAIFrame();
+    // Process the simulated message directly
+    Serial.print("Simulated CAN ID: 0x");
+    Serial.print(frame.identifier, HEX);
+    Serial.print(" Data: ");
+    for (int i = 0; i < frame.data_length_code; i++) {
+      Serial.print("0x");
+      Serial.print(frame.data[i], HEX);
+      Serial.print(" ");
+    }
+    Serial.println();
+    
+    // JSON Serializer for TWAI frame.
+    JsonDocument twai;
+    String message;
 
-  // TWAI Handler - Core of the App
+    twai["id"] = frame.identifier;
+    
+    for (int i = 0; i < sizeof(frame.data); i++) {
+      twai["data"][i] = frame.data[i];
+    }
 
-  // Read the TWAI Bus
+    serializeJson(twai, message);
+
+    ws.textAll(message);
+    return true;
+  });
+
+  // TWAI Handler - Core of the App: Read the TWAI Bus
   auto frame = handleTWAI();
 
   // Proceed if a frame is received
@@ -86,141 +91,12 @@ void loop() {
     if (!false) {
       message << "(0x" << std::hex << id << "): ";
       for (int i = 0; i < sizeof(frame.data); i++) {
-        message << std::right << std::setw(3) << frame.data[i];
+        message << std::right << std::setw(3) << std::dec << static_cast<int>(frame.data[i]);
         if (i < sizeof(frame.data) - 1) {
           message << " | ";
         }
       }
       ws.textAll(message.str().c_str());
     }
-  }
-
-  // Tasks to run at millis interval
-  // timer.tick();
-  // timer.every(1000, [](void *){ webSocket.broadcastPing(); return true; });
-}
-
-void startWebSocket() {
-  // Start WS and register Event Handler
-  ws.onEvent(handleWebSocket);
-  server.addHandler(&ws);
-  Serial.println("Web Socket registered");
-}
-
-void startWebServer() {
-  // Default Web Page
-  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
-    request->send(LittleFS, "/index.html", "text/html");
-  });
-
-
-  // Reboot command
-  server.on("/reboot", HTTP_GET, [](AsyncWebServerRequest *request) {
-    request -> send(200, "text/html", "ok");
-    sleep(500);
-    ESP.restart(); 
-  });
-
-  // Asynchronously scan for WiFi Networks
-  server.on("/scan", HTTP_GET, [](AsyncWebServerRequest *request) {
-    WiFi.scanNetworks(true);
-    request->send(200, "text/html", "ok");
-  });
-
-  // Serves the results of the latest WiFi Network Scan as JSON
-  server.on("/wifi", HTTP_GET, [](AsyncWebServerRequest *request) {
-    // Response Object
-    String response;
-    
-    // JSON Marshaller Initialization - a bit odd, but works.
-    JsonDocument net;
-    JsonArray nets = net.to<JsonArray>();
-    
-    // Populate the JSON array
-    for (auto wifi : wifiList) {
-      JsonDocument doc;
-      doc["ssid"] = wifi.ssid;
-      doc["rssi"] = wifi.rssi;
-      nets.add(doc);
-    }
-    
-    // Serialize the JSON array of WiFi Networks into response
-    serializeJson(nets, response);
-
-    // Serve Networks as JSON
-    request->send(200, "application/json", response);
-  });
-
-  // Endpoint to handle a new WiFi connection
-  server.on("/connect", HTTP_POST, [](AsyncWebServerRequest *request) {
-    // Save SSID and Password to Preferences and reboot
-    setWiFiSSID(request->arg("ssid"));
-    setWiFiPass(request->arg("pass"));
-
-    // Respond, sleep, reboot
-    // No point in doing it any other way, since the connection will be broken
-    request->send(200, "text/html", "Connecting...");
-    sleep(500);
-    ESP.restart();
-  });
-
-  // Lastly, serve static files from LittleFS
-  server.serveStatic("/", LittleFS, "/");
-
-  // Start server
-  server.begin();
-  Serial.println("Web Server started");
-}
-
-void handleWebSocket(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type, void *arg, uint8_t *data, size_t len) {
-  switch (type) {
-    case WS_EVT_CONNECT:
-      Serial.printf("WebSocket client #%u connected from %s\n", client->id(), client->remoteIP().toString().c_str());
-      break;
-    case WS_EVT_DISCONNECT:
-      Serial.printf("WebSocket client #%u disconnected\n", client->id());
-      break;
-    case WS_EVT_DATA:
-      Serial.println("Handling event data...");
-      [](void *arg, uint8_t *data, size_t len) {
-        AwsFrameInfo *info = (AwsFrameInfo*)arg;
-        if (info->final && info->index == 0 && info->len == len && info->opcode == WS_TEXT) {
-          data[len] = 0;
-          char *payload = (char *)data;
-          unsigned int numData;
-          try
-          {
-            numData = std::stoul(payload, nullptr, 16);
-          }
-          catch(const std::exception& e)
-          {
-            std::cerr << e.what() << '\n';
-          }
-
-          // Handle WS Message
-          if (strcmp(payload, "reboot") == 0) {
-            Serial.println("Restarting due to WS command");
-            ws.textAll("Restarting due to WS command...");
-          
-            sleep(500);
-            ESP.restart();
-            return;
-          }
-
-          if (numData > 0) {
-            ws.printfAll("(int) %d", numData);
-            std::ostringstream right;
-            right << std::right << std::setw(3) << numData;
-            Serial.println(right.str().c_str());
-          } else {
-            Serial.println(payload);
-            ws.textAll(payload);
-          }
-        }
-      }(arg, data, len);
-      break;
-    case WS_EVT_PONG:
-    case WS_EVT_ERROR:
-      break;
   }
 }

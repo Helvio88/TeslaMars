@@ -1,5 +1,4 @@
-#include "Arduino.h"
-#include "TWAI.h"
+#include <MARS_TWAI.h>
 
 void startTWAI(const int tx_pin, const int rx_pin) {
   twai_general_config_t general_config = {
@@ -36,9 +35,22 @@ void startTWAI(const int tx_pin, const int rx_pin) {
 }
 
 twai_message_t handleTWAI() {
-    twai_message_t rx_frame;
-    twai_receive(&rx_frame, pdMS_TO_TICKS(1000));
-    return rx_frame;
+  twai_message_t rx_frame;
+  twai_receive(&rx_frame, pdMS_TO_TICKS(1000));
+  return rx_frame;
+}
+
+// Function to simulate receiving a random TWAI frame
+twai_message_t simulateTWAIFrame() {
+  twai_message_t message;
+  message.identifier = random(0x100, 0x7FF);
+  message.data_length_code = 8;
+  for (int i = 0; i < message.data_length_code; i++) {
+    message.data[i] = random(0x00, 0xFF);
+  }
+  message.flags = TWAI_MSG_FLAG_NONE;
+  
+  return message;
 }
 
 /*
@@ -57,7 +69,7 @@ void handleTWAI() {
           message << " | ";
         }
       }
-      // ws.textAll(message.str().c_str());
+      ws.textAll(message.str().c_str());
     }
   }
 }

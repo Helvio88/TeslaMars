@@ -54,5 +54,7 @@
         "*.old": "c",
         "gpio.h": "c",
         "list": "cpp"
-    }
+    },
+    "python.analysis.typeCheckingMode": "basic",
+    "python.analysis.autoImportCompletions": true
 }

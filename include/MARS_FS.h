@@ -1,5 +1,5 @@
-#ifndef FS_PREFS
-#define FS_PREFS
+#ifndef MARS_FS
+#define MARS_FS
 
 #include <LittleFS.h>
 #include <Preferences.h>

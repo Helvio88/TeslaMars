@@ -1,8 +1,8 @@
-#ifndef WIFI
-#define WIFI
+#ifndef MARS_WIFI
+#define MARS_WIFI
 
-#include "Arduino.h"
-#include "list"
+#include <Arduino.h>
+#include <list>
 #include <Preferences.h>
 #include <WiFi.h>
 #include <WiFiClientSecure.h>

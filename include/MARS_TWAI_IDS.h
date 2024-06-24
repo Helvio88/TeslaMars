@@ -1,5 +1,5 @@
-#ifndef TWAI_IDS
-#define TWAI_IDS
+#ifndef MARS_TWAI_IDS
+#define MARS_TWAI_IDS
 
 #include <Preferences.h>
 #include <vector>

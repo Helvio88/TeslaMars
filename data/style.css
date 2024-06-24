@@ -44,8 +44,11 @@ h1 {
   color: #32cd32; /* Lime green */
 }
 #log {
+  white-space: pre;
   height: 60vh;
   overflow-y: scroll;
   border: 1px solid #ccc;
   padding: 5px;
+  font-family: monospace;
+  background-color: #f8f8f8;
 }

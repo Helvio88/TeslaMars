@@ -1,5 +1,5 @@
-#ifndef OTA
-#define OTA
+#ifndef MARS_OTA
+#define MARS_OTA
 
 #include <ArduinoOTA.h>
 

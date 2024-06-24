@@ -1,4 +1,4 @@
-#include "WIFI.h"
+#include <MARS_WIFI.h>
 
 std::list<WiFiInfo> wifiList;
 
