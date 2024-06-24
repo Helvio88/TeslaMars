@@ -17,7 +17,7 @@ ws.onmessage = (e) => {
   var twai = JSON.parse(e.data);
   var data = twai.data.map(num => num.toString().padStart(3, ' ')).join(' | ');
   const el = document.createElement('div');
-  el.innerHTML = `(<a href="#" onclick="socket.send(${twai.id})">0x${twai.id.toString(16)}</a>): ${data}`;
+  el.innerHTML = `(<a href="#" onclick="ws.send(${twai.id})">0x${twai.id.toString(16).padStart(3, '0')}</a>): ${data}`;
   if (i++ > 100) logger.removeChild(logger.firstChild);
   logger.append(el);
   logger.scrollTop = logger.scrollHeight;
@@ -28,7 +28,7 @@ sendCommand = () => {
     logger.innerHTML += `> ${cmd.value}\n`;
     ws.send(cmd.value);
     logger.scrollTop = logger.scrollHeight;
-    messageCount++;
+    i++;
   } else {
     logger.innerHTML = 'Socket Closed. Please refresh the page.';
   }

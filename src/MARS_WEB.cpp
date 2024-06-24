@@ -108,3 +108,18 @@ void handleWebSocket(AsyncWebSocket *ws, AsyncWebSocketClient *client, AwsEventT
       break;
   }
 }
+
+String TWAI2JSON(twai_message_t frame) {
+  // JSON Serializer for TWAI frame.
+  JsonDocument twai;
+  String message;
+
+  // Populate JSON document
+  twai["id"] = frame.identifier;
+  for (int i = 0; i < sizeof(frame.data); i++) {
+    twai["data"][i] = frame.data[i];
+  }
+
+  serializeJson(twai, message);
+  return message;
+}

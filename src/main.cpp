@@ -10,8 +10,8 @@
 #define HTTP_PORT     80
 #define WS_PATH       "/ws"
 
-// Timer object with up to 10 tasks
-Timer<10> timer;
+// Timer for recurring tasks
+auto timer = timer_create_default();
 
 // Web Servers
 AsyncWebServer server(HTTP_PORT);
@@ -35,6 +35,15 @@ void setup() {
     
   // Start Web Server
   startWebServer(server, ws);
+  
+  // Simulate TWAI Frame ever 5s
+  // TODO: Turn this off on command
+  timer.every(5 * 1000, [](void *none) {
+    auto frame = simulateTWAIFrame();
+    auto message = TWAI2JSON(frame);
+    ws.textAll(message);
+    return true;
+  });
 }
 
 void loop() {
@@ -50,36 +59,6 @@ void loop() {
   // Websocket Handler
   ws.cleanupClients();
   
-  // Simulate TWAI Frame
-  timer.every(15000, [](void *none) {
-    auto frame = simulateTWAIFrame();
-    // Process the simulated message directly
-    Serial.print("Simulated CAN ID: 0x");
-    Serial.print(frame.identifier, HEX);
-    Serial.print(" Data: ");
-    for (int i = 0; i < frame.data_length_code; i++) {
-      Serial.print("0x");
-      Serial.print(frame.data[i], HEX);
-      Serial.print(" ");
-    }
-    Serial.println();
-    
-    // JSON Serializer for TWAI frame.
-    JsonDocument twai;
-    String message;
-
-    twai["id"] = frame.identifier;
-    
-    for (int i = 0; i < sizeof(frame.data); i++) {
-      twai["data"][i] = frame.data[i];
-    }
-
-    serializeJson(twai, message);
-
-    ws.textAll(message);
-    return true;
-  });
-
   // TWAI Handler - Core of the App: Read the TWAI Bus
   auto frame = handleTWAI();
 

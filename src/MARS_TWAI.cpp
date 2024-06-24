@@ -40,17 +40,28 @@ twai_message_t handleTWAI() {
   return rx_frame;
 }
 
-// Function to simulate receiving a random TWAI frame
+// Simulate receiving a random TWAI frame
 twai_message_t simulateTWAIFrame() {
-  twai_message_t message;
-  message.identifier = random(0x100, 0x7FF);
-  message.data_length_code = 8;
-  for (int i = 0; i < message.data_length_code; i++) {
-    message.data[i] = random(0x00, 0xFF);
+  twai_message_t frame;
+  frame.identifier = random(0x000, 0x7FF);
+  frame.data_length_code = 8;
+  for (int i = 0; i < frame.data_length_code; i++) {
+    frame.data[i] = random(0x00, 0xFF);
   }
-  message.flags = TWAI_MSG_FLAG_NONE;
+  frame.flags = TWAI_MSG_FLAG_NONE;
   
-  return message;
+  // Print generated frame
+  Serial.print("Simulated TWAI ID: 0x");
+  Serial.print(frame.identifier, HEX);
+  Serial.print(" Data: ");
+  for (int i = 0; i < frame.data_length_code; i++) {
+    Serial.print("0x");
+    Serial.print(frame.data[i], HEX);
+    Serial.print(" ");
+  }
+  Serial.println();
+  
+  return frame;
 }
 
 /*
