@@ -1,4 +1,6 @@
-var socket = new WebSocket(`ws://${window.location.host}/ws`);
+var proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
+var socket = new WebSocket(`${proto}://${window.location.host}/ws`);
+
 var logger = document.getElementById('log');
 var messageCount = 0;
 
