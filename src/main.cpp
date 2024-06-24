@@ -1,13 +1,9 @@
-#include <algorithm>
 #include <Arduino.h>
 #include <ArduinoJson.h>
 #include <AsyncTCP.h>
 #include <ESPAsyncWebServer.h>
-#include <ESPmDNS.h>
 #include <iomanip>
 #include <iostream>
-#include <list>
-#include <Preferences.h>
 #include <sstream>
 #include <string>
 #include <unordered_set>
@@ -37,21 +33,11 @@ AsyncWebServer server(HTTP_PORT);
 // WebSocket Server
 AsyncWebSocket ws("/ws");
 
-// WiFi Networks
-struct WiFiInfo {
-  String ssid;
-  uint32_t rssi;
-
-  WiFiInfo(const String& ssid, uint32_t rssi) : ssid(ssid), rssi(rssi) {}
-};
-std::list<WiFiInfo> wifiList;
-
 // Setup Functions
 void startWebSocket();
 void startWebServer();
 
 // Loop Functions
-void handleWiFiScan();
 void handleWebSocket(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type, void *arg, uint8_t *data, size_t len);
 
 void setup() {
@@ -62,7 +48,7 @@ void setup() {
   startFS(DEVICE_NAME);
   
   // Start WiFi
-  startWiFi(getWiFiSSID(), getWiFiPass(), LED_PIN, WIFI_TIMEOUT);
+  startWiFi(getWiFiSSID(), getWiFiPass(), LED_PIN, WIFI_TIMEOUT, DEVICE_NAME);
   
   // Start OTA Service
   startOTA(DEVICE_NAME);
@@ -87,21 +73,31 @@ void loop() {
   // Websocket Handler
   ws.cleanupClients();
 
-  // TWAI Handler
+  // TWAI Handler - Core of the App
+
+  // Read the TWAI Bus
   auto frame = handleTWAI();
+
+  // Proceed if a frame is received
+  if (twai_receive(&frame, pdMS_TO_TICKS(1000)) == ESP_OK) {
+    std::ostringstream message;
+
+    auto id = frame.identifier;
+    if (!false) {
+      message << "(0x" << std::hex << id << "): ";
+      for (int i = 0; i < sizeof(frame.data); i++) {
+        message << std::right << std::setw(3) << frame.data[i];
+        if (i < sizeof(frame.data) - 1) {
+          message << " | ";
+        }
+      }
+      ws.textAll(message.str().c_str());
+    }
+  }
 
   // Tasks to run at millis interval
   // timer.tick();
   // timer.every(1000, [](void *){ webSocket.broadcastPing(); return true; });
-}
-
-void startWiFiAP() {
-  WiFi.softAP(DEVICE_NAME);
-  WiFi.scanNetworks(true);
-
-  auto ip = WiFi.softAPIP();
-  Serial.printf("Listening on AP Mode '%s' with IP: ", DEVICE_NAME);
-  Serial.println(ip);
 }
 
 void startWebSocket() {
@@ -176,35 +172,6 @@ void startWebServer() {
   Serial.println("Web Server started");
 }
 
-void handleWiFiScan() {
-  // Read number of found networks
-  int networks = WiFi.scanComplete();
-  
-  // 0 = none, -1 = in progress, -2 = not started
-  if (networks > 0) {
-    // Reset the list
-    wifiList.clear();
-    Serial.printf(PSTR("%d networks found.\n"), networks);
-
-    // SSID variables
-    String ssid;
-    uint8_t encryptionType;
-    int32_t rssi;
-    uint8_t *bssid;
-    int32_t channel;
-
-    // Populate the list with found WiFi networks
-    for (auto i = 0; i < networks; i++) {
-      WiFi.getNetworkInfo(i, ssid, encryptionType, rssi, bssid, channel);
-      wifiList.push_back(WiFiInfo(ssid, rssi));
-      yield();
-    }
-    
-    // Clear the scan results
-    WiFi.scanDelete();
-  }
-}
-
 void handleWebSocket(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type, void *arg, uint8_t *data, size_t len) {
   switch (type) {
     case WS_EVT_CONNECT:
@@ -229,7 +196,6 @@ void handleWebSocket(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEv
           {
             std::cerr << e.what() << '\n';
           }
-          
 
           // Handle WS Message
           if (strcmp(payload, "reboot") == 0) {
