@@ -64,25 +64,7 @@ twai_message_t simulateTWAIFrame() {
   return frame;
 }
 
-/*
-void handleTWAI() {
-  twai_message_t rx_frame;
-
-  if (twai_receive(&rx_frame, pdMS_TO_TICKS(1000)) == ESP_OK) {
-    std::ostringstream message;
-
-    auto id = rx_frame.identifier;
-    if (!shouldIgnore(id)) {
-      message << "(0x" << std::hex << id << "): ";
-      for (int i = 0; i < sizeof(rx_frame.data); i++) {
-        message << std::right << std::setw(3) << rx_frame.data[i];
-        if (i < sizeof(rx_frame.data) - 1) {
-          message << " | ";
-        }
-      }
-      ws.textAll(message.str().c_str());
-    }
-  }
+bool shouldIgnore(int id) {
+  auto ids = getIgnore();
+  return std::find(ids.begin(), ids.end(), id) != ids.end();
 }
-
-*/

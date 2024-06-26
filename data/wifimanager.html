@@ -1,46 +1,46 @@
 <!DOCTYPE html>
 <html>
-<head>
-  <title>Tesla Mars WiFi Manager</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="stylesheet" href="bootstrap.min.css">
-  <link rel="stylesheet" href="style.css">
-  <script src="wifi.js" defer></script>
-</head>
-<body>
-  <nav class="navbar navbar-expand-lg navbar-light">
-    <div class="container-fluid">
-      <a class="navbar-brand" href="index.html">Tesla Mars WiFi Manager</a>
-    </div>
-  </nav>
+  <head>
+    <title>Tesla Mars WiFi Manager</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="bootstrap.min.css">
+    <link rel="stylesheet" href="style.css">
+    <script src="wifi.js"></script>
+  </head>
+  <body>
+    <nav class="navbar navbar-expand-lg navbar-light">
+      <div class="container-fluid">
+        <a class="navbar-brand" href="index.html">Tesla Mars WiFi Manager</a>
+      </div>
+    </nav>
 
-  <div class="container mt-4">
-    <div class="card">
-      <div class="card-header">
-        WiFi Configuration
-      </div>
-      <div class="card-body">
-        <form action="connect" method="POST">
-          <div class="input-group mb-3 flex-nowrap">
-            <label for="ssid" class="input-group-text">SSID</label>
-            <select id="ssid" name="ssid" class="form-select" disabled>
-              <option selected>Scanning...</option>
-            </select>
-          </div>
-          <div class="input-group mb-3 flex-nowrap">
-            <label for="pass" class="input-group-text">Key</label>
-            <input type="password" id="pass" name="pass" class="form-control">
-          </div>
-          <div class="d-flex justify-content-between">
-            <button type="button" id="factory-reset" class="btn btn-danger">Reset WiFi</button>
-            <div>
-              <button type="submit" class="btn btn-primary ml-2">Submit</button>
+    <div class="container mt-4">
+      <div class="card">
+        <div class="card-header">
+          WiFi Configuration
+        </div>
+        <div class="card-body">
+          <form action="connect" method="POST">
+            <div class="input-group mb-3 flex-nowrap">
+              <label for="ssid" class="input-group-text">SSID</label>
+              <select id="ssid" name="ssid" class="form-select" disabled>
+                <option selected>Scanning...</option>
+              </select>
             </div>
-          </div>
-        </form>
+            <div class="input-group mb-3 flex-nowrap">
+              <label for="pass" class="input-group-text">Key</label>
+              <input type="password" id="pass" name="pass" class="form-control">
+            </div>
+            <div class="d-flex justify-content-between">
+              <button type="button" id="reset" class="btn btn-danger" onclick="reset()">Reset WiFi</button>
+              <div>
+                <button type="submit" class="btn btn-primary ml-2">Submit</button>
+              </div>
+            </div>
+          </form>
+        </div>
       </div>
     </div>
-  </div>
-  <script src="bootstrap.min.js"></script>
-</body>
+    <script src="bootstrap.min.js"></script>
+  </body>
 </html>

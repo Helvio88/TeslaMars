@@ -1,5 +1,6 @@
 #include <MARS_WEB.h>
 
+// Web Server Routes and Settings
 void startWebServer(AsyncWebServer &server, AsyncWebSocket &ws) {
   ws.onEvent(handleWebSocket);
   server.addHandler(&ws);
@@ -46,6 +47,20 @@ void startWebServer(AsyncWebServer &server, AsyncWebSocket &ws) {
     // Serve Networks as JSON
     request->send(200, "application/json", response);
   });
+  
+  // Display blocked IDs
+  server.on("/ids", HTTP_GET, [](AsyncWebServerRequest *request) {
+    auto ids = getIgnore();
+    
+    JsonArray arr = JsonDocument().to<JsonArray>();
+    for (int id : ids) {
+      arr.add(id);
+    }
+    
+    String response;
+    serializeJson(arr, response);
+    request->send(200, "application/json", response);    
+  });
 
   // Endpoint to handle a new WiFi connection
   server.on("/connect", HTTP_POST, [](AsyncWebServerRequest *request) {
@@ -84,9 +99,18 @@ void handleWebSocket(AsyncWebSocket *ws, AsyncWebSocketClient *client, AwsEventT
         if (info->final && info->index == 0 && info->len == len && info->opcode == WS_TEXT) {
           data[len] = 0;
           char *payload = (char *)data;
-          unsigned int numData;
+          int numData;
           try {
-            numData = std::stoul(payload, nullptr, 16);
+            numData = std::stoul(payload, nullptr);
+            
+            if(numData > 0) {
+              addIgnore(numData);
+            } else if (numData < 0) {
+              delIgnore(numData * -1);
+            } else {
+              setIgnore({});
+            }
+            
             Serial.println(numData);
           } catch(const std::exception& e) {
             std::cerr << e.what() << '\n';

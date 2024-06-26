@@ -28,3 +28,41 @@ void setWiFiSSID(const String ssid) {
 void setWiFiPass(const String pass) {
   prefs.putString("pass", pass);
 }
+
+std::vector<int> getIgnore() {
+  // Create a JSON Array and populate with saved IDs
+  JsonDocument arr;
+  deserializeJson(arr, prefs.getString("ignore", "[]"));
+
+  std::vector<int> ids = {};
+  for (int i = 0; i < arr.size(); i++) {
+    ids.push_back(arr[i]);
+  }
+  
+  return ids;
+}
+
+void addIgnore(int id) {
+  auto ids = getIgnore();
+  ids.push_back(id);
+  setIgnore(ids);
+}
+
+void delIgnore(int id) {
+  auto ids = getIgnore();
+  auto it = std::find(ids.begin(), ids.end(), id);
+  if (it != ids.end()) {
+    ids.erase(it);
+  }
+  setIgnore(ids);
+}
+
+void setIgnore(std::vector<int> ids) {
+  String ignore;
+  JsonDocument arr = JsonDocument().to<JsonArray>();
+  for(int id : ids) {
+    arr.add(id);
+  }
+  serializeJson(arr, ignore);
+  prefs.putString("ignore", ignore);
+}
